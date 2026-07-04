@@ -1,0 +1,36 @@
+@import "tailwindcss";
+@import "primeicons/primeicons.css";
+
+:root {
+  --color-bg: #12141C;
+  --color-surface: #1B1E2A;
+  --color-border: #2C303F;
+  --color-text: #E8E6E1;
+  --color-text-muted: #8B8F9E;
+  --color-accent: #E0A75E;
+  --color-accent-alt: #5EC9C0;
+}
+
+@theme {
+  --color-bg: var(--color-bg);
+  --color-surface: var(--color-surface);
+  --color-border: var(--color-border);
+  --color-ink: var(--color-text);
+  --color-muted: var(--color-text-muted);
+  --color-accent: var(--color-accent);
+  --color-accent-alt: var(--color-accent-alt);
+}
+
+body {
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  min-height: 100vh;
+  margin: 0;
+}
+
+#app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
