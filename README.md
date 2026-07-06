@@ -95,6 +95,56 @@ Jika ingin menyambungkan aplikasi dengan backend FastAPI, ganti data mock di dal
 
 ---
 
+## 📂 Alur Logic Pengunggahan & Pemrosesan Berkas Chat
+
+Fitur pengunggahan berkas obrolan pada halaman `/upload` telah dilengkapi dengan alur logic pemrosesan data asinkron langsung di sisi klien (*client-side processing*) sebelum dikirim ke backend:
+
+### 1. Validasi Format Berkas
+* Berkas yang diterima hanya berformat **`.txt`** dan **`.zip`**.
+* Jika pengguna mengunggah format lain, UI akan langsung menampilkan pesan peringatan (*error alert*) dan memblokir tombol navigasi ke tahap selanjutnya.
+
+### 2. Ekstraksi Berkas ZIP (Client-Side)
+* Jika berkas yang diunggah berupa `.zip`, pustaka `JSZip` akan mengekstraknya di latar belakang untuk mencari berkas log obrolan `.txt` pertama di dalamnya.
+* Jika berkas `.txt` tidak ditemukan di dalam `.zip`, sistem memicu error di UI.
+
+### 3. Normalisasi & Parsing Log Obrolan ke CSV
+Isi dari berkas `.txt` dibaca dan diparsing menggunakan regex berdasarkan 3 variasi format log WhatsApp Android:
+* **Android ID 12 jam**: `dd/mm/yy hh.mm AM/PM - sender: msg`
+* **Android ID 24 jam**: `dd/mm/yy hh.mm - sender: msg`
+* **Android EN 12 jam**: `d/m/yy, hh:mm am/pm - sender: msg`
+
+Setiap baris yang sesuai diparsing menjadi entitas pesan dengan timestamp yang dinormalisasi ke format standar **ISO 8601** (`YYYY-MM-DDTHH:mm:ss`). Pesan multi-baris (*multi-line messages*) secara otomatis diakumulasikan ke pesan pengirim yang sesuai. Baris sistem (seperti info masuk/keluar grup) diabaikan secara aman.
+> [!WARNING]
+> Jika proses parsing tidak menghasilkan satu pun pesan valid, aplikasi menganggap berkas rusak/tidak cocok dan memicu error visual di UI.
+
+### 4. Anonimisasi Pengirim (*Sender Anonymization*)
+Demi menjaga privasi pengguna, seluruh pengirim pesan dianonimkan dengan algoritma hashing SHA-256 yang memiliki salt `"chat-analisis-v1"`:
+* **Pengirim Tipe Sistem**: Tetap ditulis `"SYSTEM"`.
+* **Pengirim Nomor Telepon**: Misal `+628123456789` -> Dinormalisasi menjadi `User-[4_digit_hash]·7899` (mempertahankan 4 angka terakhir nomor telepon).
+* **Pengirim Nama Biasa**: Misal `Budi Santoso` -> Dinormalisasi menjadi `User-[4_digit_hash]` (hanya awalan prefix hash).
+
+### 5. Manajemen Sesi (*Local Session*)
+* Aplikasi secara otomatis membuat identifier sesi unik (`session_id`) baru untuk melacak proses analisis pengguna saat mengunggah berkas. Sesi ini disimpan secara persisten di **`localStorage`** pengguna dengan kunci `chat_analisis_session_id`.
+
+### 6. Integrasi TimeRangeFilter Dinamis
+* Data hasil parsing digunakan untuk menghitung frekuensi pesan harian secara dinamis (mengisi hari kosong dengan angka `0`).
+* Data distribusi ini dikirim langsung ke komponen `TimeRangeFilter` untuk memvisualisasikan grafik kepadatan chat aktual yang diunggah.
+* Slider filter tanggal diatur secara dinamis dari **tanggal pesan paling awal** (`startDate`) ke **tanggal pesan paling lambat** (`endDate`) yang terdeteksi dari log chat.
+
+### 7. Pengiriman Data ke Backend API
+Saat pengguna menekan tombol **"Mulai Analisis"**, berkas CSV yang dianonimkan beserta parameter filter waktu dikirimkan ke backend melalui metode `POST` menggunakan `FormData`:
+* **Endpoint**: `POST /api/upload`
+* **Payload**:
+  * `file`: Berkas CSV hasil parsing (`whatsapp_chat.csv`).
+  * `session_id`: Sesi unik dari `localStorage`.
+  * `startDate`: Tanggal awal pilihan slider (format `YYYY-MM-DD`).
+  * `endDate`: Tanggal akhir pilihan slider (format `YYYY-MM-DD`).
+
+Fungsi integrasi API ini dideklarasikan pada [src/services/api.ts](file:///home/usereal/Projects/Sistem%20Skripsi/ChatAnalisis-FE/src/services/api.ts) dengan nama `uploadChatFile`.
+
+---
+
+
 ## 🚀 Panduan Pengembangan & Build
 
 ### Instalasi Dependensi

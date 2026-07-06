@@ -10,6 +10,7 @@ const props = defineProps<{
   modelValue: [number, number]
   startDate: string
   endDate: string
+  chartData?: { labels: string[]; values: number[] }
 }>()
 
 const emit = defineEmits<{
@@ -25,6 +26,13 @@ const sliderValue = computed({
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 let chartInstance: Chart | null = null
 
+const dateRangeLabel = computed(() => {
+  if (props.startDate && props.endDate) {
+    return `${props.startDate} - ${props.endDate}`
+  }
+  return 'Juni - Juli 2026'
+})
+
 const initChart = () => {
   if (!canvasRef.value) return
   
@@ -36,8 +44,8 @@ const initChart = () => {
   gradient.addColorStop(0, 'rgba(94, 201, 192, 0.4)') // --color-accent-alt with opacity
   gradient.addColorStop(1, 'rgba(94, 201, 192, 0)')
 
-  const labels = Array.from({ length: 15 }, (_, i) => `Day ${i + 1}`)
-  const values = [12, 19, 32, 25, 45, 38, 52, 60, 48, 56, 72, 64, 50, 42, 45]
+  const labels = props.chartData?.labels || Array.from({ length: 15 }, (_, i) => `Day ${i + 1}`)
+  const values = props.chartData?.values || [12, 19, 32, 25, 45, 38, 52, 60, 48, 56, 72, 64, 50, 42, 45]
 
   chartInstance = new Chart(ctx, {
     type: 'line',
@@ -75,7 +83,7 @@ const destroyChart = () => {
   }
 }
 
-// Re-initialize preview chart on state changes
+// Re-initialize preview chart on state changes or chartData changes
 watch(
   () => props.enabled,
   (newVal) => {
@@ -87,6 +95,17 @@ watch(
       destroyChart()
     }
   }
+)
+
+watch(
+  () => props.chartData,
+  () => {
+    if (props.enabled) {
+      destroyChart()
+      initChart()
+    }
+  },
+  { deep: true }
 )
 
 onMounted(() => {
@@ -116,7 +135,7 @@ onBeforeUnmount(() => {
       <div class="bg-bg/60 border border-border rounded-xl p-3 space-y-2">
         <span class="text-[10px] text-muted flex items-center justify-between">
           <span>Distribusi Kepadatan Pesan Percakapan</span>
-          <span class="font-mono">Juni - Juli 2026</span>
+          <span class="font-mono">{{ dateRangeLabel }}</span>
         </span>
         <div class="h-[60px] relative w-full">
           <canvas ref="canvasRef"></canvas>
