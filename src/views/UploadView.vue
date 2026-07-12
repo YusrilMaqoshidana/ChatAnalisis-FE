@@ -1,249 +1,54 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
-import { useRouter } from 'vue-router'
+import { onBeforeUnmount } from 'vue'
 import Button from 'primevue/button'
-import { useResultsStore } from '@/stores/results'
+import { storeToRefs } from 'pinia'
+import { useUploadStore } from '@/stores/upload'
 import DropZone from '../components/DropZone.vue'
 import TimeRangeFilter from '../components/TimeRangeFilter.vue'
 import TerminalSimulator from '../components/TerminalSimulator.vue'
-import {
-  extractTxtFromZip,
-  parsingTxtToMessages,
-  anonymizeMessages,
-  convertToCSV,
-  calculateDailyActivity,
-  getOrCreateSessionId,
-  type DailyActivity
-} from '@/services/chatParser'
-import { uploadChatFile } from '@/services/api'
 
-const router = useRouter()
-const store = useResultsStore()
+const uploadStore = useUploadStore()
 
-const selectedFile = ref<File | null>(null)
-const uploadError = ref<string | null>(null)
-const uploadErrorDetail = ref<string | null>(null)
-const parsedCSVString = ref<string>('')
-const dailyActivity = ref<DailyActivity | null>(null)
-const isAnalyzing = ref(false)
-const activeTimeoutId = ref<number | null>(null)
+const {
+  selectedFile,
+  uploadError,
+  uploadErrorDetail,
+  dailyActivity,
+  isAnalyzing,
+  currentStep,
+  rangeValues,
+  analysisSteps,
+  startDateFormatted,
+  endDateFormatted
+} = storeToRefs(uploadStore)
 
-// Active Wizard Step: 1 = Upload, 2 = Date Filter, 3 = Terminal Simulation
-const currentStep = ref(1)
-
-// Slider values representing percentage from 0 to 100
-const rangeValues = ref<[number, number]>([0, 100])
-
-// Helper for date calculation to avoid duplication
-const computeDate = (percent: number): Date | null => {
-  if (!dailyActivity.value) return null
-  const date = new Date(dailyActivity.value.startDateObj)
-  const daysToAdd = Math.round((percent / 100) * dailyActivity.value.totalDays)
-  date.setDate(date.getDate() + daysToAdd)
-  return date
-}
-
-const startDate = computed(() => computeDate(rangeValues.value[0]))
-const endDate = computed(() => computeDate(rangeValues.value[1]))
-
-// Calculate date params for endpoints and display formatting
-const startDateFormatted = computed(() => {
-  return startDate.value?.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) ?? '1 Juni 2026'
-})
-
-const endDateFormatted = computed(() => {
-  return endDate.value?.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) ?? '4 Juli 2026'
-})
-
-// ISO Date formats for API call
-const startDateParam = computed(() => {
-  return startDate.value?.toISOString().split('T')[0] ?? ''
-})
-
-const endDateParam = computed(() => {
-  return endDate.value?.toISOString().split('T')[0] ?? ''
-})
-
-// Initialize Session ID on mount
-onMounted(() => {
-  getOrCreateSessionId()
-})
-
-// Clean up timers on unmount
-onBeforeUnmount(() => {
-  if (activeTimeoutId.value !== null) {
-    clearTimeout(activeTimeoutId.value)
-  }
-})
-
-// Terminal loading steps representation
-interface AnalysisStep {
-  id: number
-  label: string
-  status: 'pending' | 'running' | 'completed' | 'failed'
-  timeElapsed?: string
-}
-
-const analysisSteps = ref<AnalysisStep[]>([
-  { id: 1, label: 'Mengunggah berkas obrolan ke server analisis', status: 'pending' },
-  { id: 2, label: 'Preprocessing teks & pembersihan pesan', status: 'pending' },
-  { id: 3, label: 'Ekstraksi embedding kalimat (IndoBERTweet)', status: 'pending' },
-  { id: 4, label: 'Reduksi dimensi vektor embedding dengan UMAP', status: 'pending' },
-  { id: 5, label: 'Pengelompokan dokumen dengan BIRCH Clustering', status: 'pending' },
-  { id: 6, label: 'Ekstraksi representasi kata kunci topik menggunakan c-TF-IDF / BM25', status: 'pending' }
-])
-
-const activeStepIdx = ref(-1)
-
-const handleFileSelect = async (file: File) => {
-  uploadError.value = null
-  selectedFile.value = file
-
-  const extension = file.name.split('.').pop()?.toLowerCase()
-  if (extension !== 'txt' && extension !== 'zip') {
-    uploadError.value = 'Warning: Format berkas tidak didukung. Harap unggah berkas .zip atau .txt.'
-    selectedFile.value = null
-    parsedCSVString.value = ''
-    dailyActivity.value = null
-    return
-  }
-
-  try {
-    let txtContent = ''
-    if (extension === 'zip') {
-      const extracted = await extractTxtFromZip(file)
-      txtContent = extracted.content
-    } else {
-      txtContent = await file.text()
-    }
-
-    // Parse txt contents
-    const messages = await parsingTxtToMessages(txtContent)
-
-    // Anonymize senders
-    const anonymized = await anonymizeMessages(messages)
-
-    // Convert anonymized data to CSV string
-    parsedCSVString.value = convertToCSV(anonymized)
-
-    // Calculate daily activity frequency
-    dailyActivity.value = calculateDailyActivity(anonymized)
-
-    // Reset range values
-    rangeValues.value = [0, 100]
-
-  } catch (err: unknown) {
-    const errorObj = err as Error
-    uploadError.value = errorObj.message || 'Gagal memproses berkas chat.'
-    selectedFile.value = null
-    parsedCSVString.value = ''
-    dailyActivity.value = null
-  }
+const handleFileSelect = (file: File) => {
+  uploadStore.handleFileSelect(file)
 }
 
 const handleFileClear = () => {
-  selectedFile.value = null
-  uploadError.value = null
-  parsedCSVString.value = ''
-  dailyActivity.value = null
-  currentStep.value = 1
+  uploadStore.handleFileClear()
 }
 
 const nextStep = () => {
-  if (selectedFile.value && !uploadError.value && currentStep.value === 1) {
-    currentStep.value = 2
-  }
+  uploadStore.nextStep()
 }
 
 const prevStep = () => {
-  if (currentStep.value === 2) {
-    currentStep.value = 1
-  }
+  uploadStore.prevStep()
 }
 
-// Fallback method for presentational mockup/demo mode in case backend isn't running
+const startAnalysis = () => {
+  uploadStore.startAnalysis()
+}
+
 const proceedToResultsWithDemoData = () => {
-  // TODO: Hubungkan dengan integrasi kemajuan WebSocket real-time sesungguhnya untuk production
-  store.setAnalyzed(true)
-  router.push('/results')
+  uploadStore.proceedToResultsWithDemoData()
 }
 
-// Run terminal simulation steps & call backend upload
-const startAnalysis = async () => {
-  if (!selectedFile.value || !parsedCSVString.value) return
-  currentStep.value = 3
-  isAnalyzing.value = true
-  activeStepIdx.value = 0
-  uploadErrorDetail.value = null
-
-  // Reset all steps to pending
-  analysisSteps.value.forEach(s => s.status = 'pending')
-
-  const sessionId = getOrCreateSessionId()
-  const csvBlob = new Blob([parsedCSVString.value], { type: 'text/csv;charset=utf-8' })
-
-  // Mark step 1 as running
-  const firstStep = analysisSteps.value[0]
-  if (firstStep) {
-    firstStep.status = 'running'
-  }
-  const startTime = Date.now()
-
-  try {
-    // Panggil API upload riil
-    await uploadChatFile(csvBlob, sessionId, startDateParam.value || '', endDateParam.value || '')
-
-    // Step 1 selesai sukses
-    if (firstStep) {
-      firstStep.status = 'completed'
-      firstStep.timeElapsed = `${Math.round(Date.now() - startTime)}ms`
-    }
-
-    // Lanjutkan langkah visual berikutnya
-    activeStepIdx.value = 1
-    runRemainingSteps()
-  } catch (err: any) {
-    console.error('API Error during analysis upload:', err)
-    const apiErrorMsg = err.response?.data?.message || err.message || 'Gagal mengunggah berkas analisis ke server.'
-
-    // Set step 1 to failed
-    if (firstStep) {
-      firstStep.status = 'failed'
-    }
-    isAnalyzing.value = false
-    uploadErrorDetail.value = apiErrorMsg
-  }
-}
-
-// Sequence remaining timers to simulate terminal outputs
-const runRemainingSteps = () => {
-  const idx = activeStepIdx.value
-  if (idx >= analysisSteps.value.length) {
-    // Completed all steps successfully
-    activeTimeoutId.value = window.setTimeout(() => {
-      store.setAnalyzed(true)
-      router.push('/results')
-    }, 500)
-    return
-  }
-
-  // Set current step to running
-  const step = analysisSteps.value[idx]
-  if (step) {
-    step.status = 'running'
-  }
-
-  activeTimeoutId.value = window.setTimeout(() => {
-    // Complete current step
-    const currentStepObj = analysisSteps.value[idx]
-    if (currentStepObj) {
-      currentStepObj.status = 'completed'
-      currentStepObj.timeElapsed = `${Math.round(250 + Math.random() * 350)}ms`
-    }
-    activeStepIdx.value++
-    runRemainingSteps()
-  }, 800)
-}
+onBeforeUnmount(() => {
+  uploadStore.cleanupTimeout()
+})
 </script>
 
 

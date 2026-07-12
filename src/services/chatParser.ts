@@ -10,15 +10,11 @@ const INVISIBLE_CHARS = [
 const SPACE_LIKE_CHARS = ["\u00a0", "\u202f", "\u2009", "\u2007"]
 
 // ─── Regex Patterns ───────────────────────────────────────────────────────────
+import type { ParsedMessage } from '@/types/chat'
+
 const ANDROID_ID_12H_MSG = /^(\d{2}\/\d{2}\/\d{2})\s+(\d{1,2}\.\d{2})\s+([AP]M)\s+-\s+(.*?):\s+(.*)$/
 const ANDROID_ID_24H_MSG = /^(\d{2}\/\d{2}\/\d{2})\s+(\d{1,2}\.\d{2})\s+-\s+(.*?):\s+(.*)$/
 const ANDROID_EN_12H_MSG = /^(\d{1,2}\/\d{1,2}\/\d{2}),\s+(\d{1,2}:\d{2})\s+([ap]m)\s+-\s+(.*?):\s+(.*)$/
-
-export interface ParsedMessage {
-  timestamp: string // ISO 8601 (YYYY-MM-DDTHH:mm:ss)
-  sender: string
-  pesan: string
-}
 
 // ─── Zip extraction ─────────────────────────────────────────────────────────
 /**
@@ -28,19 +24,19 @@ export interface ParsedMessage {
 export async function extractTxtFromZip(file: File): Promise<{ name: string; content: string }> {
   const zip = new JSZip()
   const loadedZip = await zip.loadAsync(file)
-  
+
   // Find the first file that ends with .txt
   const txtFileKey = Object.keys(loadedZip.files).find(key => key.toLowerCase().endsWith('.txt'))
-  
+
   if (!txtFileKey) {
     throw new Error('Tidak ditemukan file .txt di dalam file ZIP.')
   }
-  
+
   const txtFile = loadedZip.files[txtFileKey]
   if (!txtFile) {
     throw new Error('Gagal membaca file .txt di dalam ZIP.')
   }
-  
+
   const content = await txtFile.async('string')
   return { name: txtFile.name, content }
 }
@@ -82,7 +78,7 @@ function parseTimestampToISO(rawTimestamp: string, fmt: string): string {
   if (parts.length < 2) {
     throw new Error(`Timestamp tidak valid: ${rawTimestamp}`)
   }
-  
+
   const datePart = parts[0] || ""
   const timePart = parts[1] || ""
   const meridiemPart = parts[2] || ""
@@ -91,7 +87,7 @@ function parseTimestampToISO(rawTimestamp: string, fmt: string): string {
   if (dateSplits.length !== 3) {
     throw new Error(`Format tanggal tidak valid: ${datePart}`)
   }
-  
+
   const day = parseInt(dateSplits[0] || "0", 10)
   const month = parseInt(dateSplits[1] || "0", 10)
   const year2d = parseInt(dateSplits[2] || "0", 10)
@@ -101,7 +97,7 @@ function parseTimestampToISO(rawTimestamp: string, fmt: string): string {
   if (timeSplits.length !== 2) {
     throw new Error(`Format waktu tidak valid: ${timePart}`)
   }
-  
+
   let hour = parseInt(timeSplits[0] || "0", 10)
   const minute = parseInt(timeSplits[1] || "0", 10)
 
@@ -245,69 +241,10 @@ export async function parsingTxtToMessages(fileContent: string): Promise<ParsedM
   return messages
 }
 
-// ─── Anonymization Logic ──────────────────────────────────────────────────────
-const SYSTEM_SENDER = "SYSTEM"
-const USER_PREFIX = "User-"
-const ANONYMIZATION_SALT = "chat-analisis-v1"
-const PHONE_PATTERN = /^\+\d{8,15}$/
-
-async function sha256(message: string): Promise<string> {
-  const msgBuffer = new TextEncoder().encode(message)
-  const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer)
-  const hashArray = Array.from(new Uint8Array(hashBuffer))
-  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
-  return hashHex
-}
-
-function normalizeSender(sender: string): string {
-  return sender.trim().toLowerCase()
-}
-
-function isPhoneNumber(normalizedSender: string): boolean {
-  const cleaned = normalizedSender.replace(/[^\d+]/g, '')
-  return PHONE_PATTERN.test(cleaned)
-}
-
-function extractLastFour(normalizedSender: string): string {
-  const digits = normalizedSender.replace(/\D/g, '')
-  return digits.length >= 4 ? digits.slice(-4) : digits.padStart(4, '0')
-}
-
-async function hashPrefix(normalizedSender: string): Promise<string> {
-  const raw = `${ANONYMIZATION_SALT}:${normalizedSender}`
-  const hashed = await sha256(raw)
-  return hashed.slice(0, 4)
-}
-
-export async function anonymizeSender(sender: string): Promise<string> {
-  const original = sender.trim()
-  if (original === SYSTEM_SENDER) {
-    return SYSTEM_SENDER
-  }
-  const normalized = normalizeSender(original)
-  const prefix = await hashPrefix(normalized)
-  if (isPhoneNumber(normalized)) {
-    return `${USER_PREFIX}${prefix}·${extractLastFour(normalized)}`
-  }
-  return `${USER_PREFIX}${prefix}`
-}
-
-export async function anonymizeMessages(messages: ParsedMessage[]): Promise<ParsedMessage[]> {
-  const anonymized: ParsedMessage[] = []
-  for (const m of messages) {
-    const anonSender = await anonymizeSender(m.sender)
-    anonymized.push({
-      ...m,
-      sender: anonSender
-    })
-  }
-  return anonymized
-}
-
 // ─── CSV Conversion ───────────────────────────────────────────────────────────
 export function convertToCSV(messages: ParsedMessage[]): string {
   const headers = ["Timestamp", "Pengirim", "Pesan"]
-  
+
   const escape = (val: string) => {
     const cleaned = val.replace(/"/g, '""')
     if (cleaned.includes(',') || cleaned.includes('"') || cleaned.includes('\n') || cleaned.includes('\r')) {
@@ -323,78 +260,5 @@ export function convertToCSV(messages: ParsedMessage[]): string {
   return [headers.join(","), ...rows].join("\n")
 }
 
-// ─── Daily Activity (Chart Data & Dates) ──────────────────────────────────────
-export interface DailyActivity {
-  labels: string[]
-  values: number[]
-  allDates: string[]
-  startDateObj: Date
-  totalDays: number
-}
 
-export function calculateDailyActivity(messages: ParsedMessage[]): DailyActivity {
-  const dateCounts: Record<string, number> = {}
-  for (const m of messages) {
-    const dateStr = m.timestamp.split("T")[0]
-    if (dateStr) {
-      dateCounts[dateStr] = (dateCounts[dateStr] || 0) + 1
-    }
-  }
 
-  const sortedDates = Object.keys(dateCounts).sort()
-  if (sortedDates.length === 0) {
-    return {
-      labels: [],
-      values: [],
-      allDates: [],
-      startDateObj: new Date(),
-      totalDays: 0
-    }
-  }
-
-  const minDateStr = (sortedDates[0] || new Date().toISOString().split("T")[0]) as string
-  const maxDateStr = (sortedDates[sortedDates.length - 1] || new Date().toISOString().split("T")[0]) as string
-  
-  const startDateObj = new Date(minDateStr)
-  const endDateObj = new Date(maxDateStr)
-  
-  const labels: string[] = []
-  const values: number[] = []
-  const allDates: string[] = []
-  
-  const tempDate = new Date(startDateObj)
-  while (tempDate <= endDateObj) {
-    const year = tempDate.getFullYear()
-    const month = String(tempDate.getMonth() + 1).padStart(2, '0')
-    const day = String(tempDate.getDate()).padStart(2, '0')
-    const dateStr = `${year}-${month}-${day}`
-    
-    allDates.push(dateStr)
-    
-    // Label format "04 Jul"
-    const labelStr = tempDate.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })
-    labels.push(labelStr)
-    
-    values.push(dateCounts[dateStr] || 0)
-    
-    tempDate.setDate(tempDate.getDate() + 1)
-  }
-
-  return {
-    labels,
-    values,
-    allDates,
-    startDateObj,
-    totalDays: allDates.length - 1 || 1
-  }
-}
-
-// ─── Session management ───────────────────────────────────────────────────────
-export function getOrCreateSessionId(): string {
-  let sessionId = localStorage.getItem("chat_analisis_session_id")
-  if (!sessionId) {
-    sessionId = "session_" + Math.random().toString(36).substring(2, 15) + "_" + Date.now()
-    localStorage.setItem("chat_analisis_session_id", sessionId)
-  }
-  return sessionId
-}

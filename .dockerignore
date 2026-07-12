@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.git/
+.vscode/
+.eslintcache
+.editorconfig
+.prettierrc.json
+.oxlintrc.json
+Dockerfile

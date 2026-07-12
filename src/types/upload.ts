@@ -1,13 +1,17 @@
 // types/upload.ts
 
-export interface UploadResponse {
-  success: boolean
-  message: string
-  analysisId?: string
+export interface DailyActivity {
+  labels: string[]
+  values: number[]
+  allDates: string[]
+  startDateObj: Date
+  totalDays: number
 }
 
-export interface UploadState {
-  file: File | null
-  loading: boolean
-  error: string | null
+export interface AnalysisStep {
+  id: number
+  label: string
+  status: 'pending' | 'running' | 'completed' | 'failed'
+  timeElapsed?: string
 }
+

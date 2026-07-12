@@ -1,40 +1,6 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
-
-export interface Topic {
-  topicId: number
-  label: string
-  messageCount: number
-  keywords: string[]
-  percentage: number
-  sentiment: string
-  sentimentColor: string
-}
-
-export interface Sender {
-  name: string
-  messageCount: number
-  avatarInitial: string
-}
-
-export interface ActiveDate {
-  date: string
-  count: number
-}
-
-export interface ActiveHour {
-  hour: number
-  count: number
-}
-
-export interface Message {
-  id: number
-  sender: string
-  content: string
-  timestamp: string
-  topicId: number
-  date: string
-}
+import type { Topic, Sender, ActiveDate, ActiveHour, Message } from '@/types/results'
 
 export const useResultsStore = defineStore('results', () => {
   // Session flag to restrict direct manual access to /results pages
