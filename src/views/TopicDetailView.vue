@@ -1,35 +1,94 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+// src/views/TopicDetailView.vue
+// ─── MVI: View Layer for Topic Detail Page ───────────────────────────────────
+//
+// The View reads state from the store and dispatches typed Intents.
+// Local UI state (modal visibility, loading flags) stays in the View
+// since it is purely presentational and does not affect the global model.
+// ─────────────────────────────────────────────────────────────────────────────
+
+import { ref, computed, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { useResultsStore } from '@/stores/results'
+import type { MessageContext } from '@/stores/results'
+import type { Message } from '@/types/results'
+import { ResultsIntentCreators } from '@/intents/results.intents'
 import MessageListItem from '@/components/MessageListItem.vue'
 import MessageContextModal from '@/components/MessageContextModal.vue'
 
 const route = useRoute()
-const router = useRouter()
 const store = useResultsStore()
 
+// ── Derived state from route ──────────────────────────────────────────────────
 const topicId = computed(() => parseInt(route.params.topicId as string))
 
-// Find current topic details
-const topic = computed(() => {
-  return store.topics.find((t) => t.topicId === topicId.value)
-})
+const topic = computed(() => store.topics.find((t) => t.topicId === topicId.value))
 
-// Retrieve messages for this topic
-const topicMessages = computed(() => {
-  return store.getTopicMessages(topicId.value)
-})
-
-// Modal states
+// ── Local UI state ────────────────────────────────────────────────────────────
+// These are view-only states (loading indicators, modal visibility).
+// They live in the View — not in the global Model — since they are transient UI.
+const topicMessages = ref<Message[]>([])
+const isMessagesLoading = ref(false)
 const modalVisible = ref(false)
 const focusedMessage = ref<{ sender: string; content: string; timestamp: string } | null>(null)
-const contextMessages = ref<
-  Array<{ sender: string; content: string; timestamp: string; isFocused: boolean }>
->([])
+const contextMessages = ref<MessageContext[]>([])
+const isContextLoading = ref(false)
 
-// Handle message item click to trigger modal
-const handleMessageClick = (msg: {
+const sortedMessages = computed(() => {
+  if (!topicMessages.value) return []
+  if (!topic.value || !topic.value.keywords || topic.value.keywords.length === 0) {
+    return topicMessages.value
+  }
+
+  const list = [...topicMessages.value]
+  const keywords = topic.value.keywords.map((kw) => kw.toLowerCase().trim())
+
+  const countKeywordMatches = (content: string) => {
+    if (!content) return 0
+    const lowerContent = content.toLowerCase()
+    let count = 0
+    for (const kw of keywords) {
+      if (lowerContent.includes(kw)) {
+        count++
+      }
+    }
+    return count
+  }
+
+  return list.sort((a, b) => {
+    const matchesA = countKeywordMatches(a.content)
+    const matchesB = countKeywordMatches(b.content)
+    if (matchesA !== matchesB) {
+      return matchesB - matchesA
+    }
+    return a.id - b.id
+  })
+})
+
+// ── Intent Dispatchers ───────────────────────────────────────────────────────
+watch(
+  topicId,
+  async (newId) => {
+    if (isNaN(newId)) return
+    isMessagesLoading.value = true
+    try {
+      // If store topics are empty (e.g. page refreshed), fetch overview first
+      if (store.topics.length === 0) {
+        await store.dispatch(ResultsIntentCreators.fetchOverview())
+      }
+      // Dispatch intent and receive returned messages (typed as Message[])
+      const result = await store.dispatch(ResultsIntentCreators.fetchTopicMessages(newId))
+      topicMessages.value = (result as Message[]) ?? []
+    } catch (err: unknown) {
+      console.error('Error loading topic detail messages:', err)
+    } finally {
+      isMessagesLoading.value = false
+    }
+  },
+  { immediate: true },
+)
+
+const onMessageClick = async (msg: {
   id: number
   sender: string
   content: string
@@ -40,14 +99,23 @@ const handleMessageClick = (msg: {
     content: msg.content,
     timestamp: msg.timestamp,
   }
-  // Retrieve the original timeline context
-  contextMessages.value = store.getMessageContext(msg.id)
+  isContextLoading.value = true
+  contextMessages.value = []
   modalVisible.value = true
+
+  try {
+    const backendMsgId = `msg_${msg.id}`
+    const result = await store.dispatch(ResultsIntentCreators.fetchMessageContext(backendMsgId))
+    contextMessages.value = (result as MessageContext[]) ?? []
+  } catch (err: unknown) {
+    console.error('Error fetching message context:', err)
+  } finally {
+    isContextLoading.value = false
+  }
 }
 
-const goBack = () => {
-  router.push('/results')
-}
+// Back navigation is handled directly in the template via $router.push('/results')
+// since it is purely presentational with no side effects on the model.
 </script>
 
 <template>
@@ -55,7 +123,7 @@ const goBack = () => {
     <!-- Back Navigation -->
     <div>
       <button
-        @click="goBack"
+        @click="$router.push('/results')"
         class="inline-flex items-center gap-2 text-sm font-medium text-muted hover:text-ink transition-colors duration-200 cursor-pointer"
       >
         <i class="pi pi-arrow-left text-xs"></i>
@@ -115,12 +183,12 @@ const goBack = () => {
       <!-- Message List -->
       <div class="space-y-3">
         <MessageListItem
-          v-for="msg in topicMessages"
+          v-for="msg in sortedMessages"
           :key="msg.id"
           :sender="msg.sender"
           :content="msg.content"
           :timestamp="msg.timestamp"
-          @click="handleMessageClick(msg)"
+          @click="onMessageClick(msg)"
         />
       </div>
     </div>

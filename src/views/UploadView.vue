@@ -1,53 +1,69 @@
 <script setup lang="ts">
+// src/views/UploadView.vue
+// ─── MVI: View Layer for Upload Feature ─────────────────────────────────────
+//
+// The View is responsible ONLY for:
+//   1. Reading reactive state from the store (via storeToRefs).
+//   2. Dispatching typed Intents to the store in response to user events.
+//   3. Rendering UI based on the current state.
+//
+// The View does NOT contain business logic, data fetching, or direct state mutations.
+// All user interactions produce an Intent that is dispatched to the store.
+// ─────────────────────────────────────────────────────────────────────────────
+
 import { onBeforeUnmount } from 'vue'
 import Button from 'primevue/button'
 import { storeToRefs } from 'pinia'
 import { useUploadStore } from '@/stores/upload'
+import { UploadIntentCreators } from '@/intents/upload.intents'
 import DropZone from '../components/DropZone.vue'
 import TimeRangeFilter from '../components/TimeRangeFilter.vue'
 import TerminalSimulator from '../components/TerminalSimulator.vue'
 
-const uploadStore = useUploadStore()
+const store = useUploadStore()
 
+// Read-only reactive state from the model
 const {
   selectedFile,
   uploadError,
   uploadErrorDetail,
   dailyActivity,
   isAnalyzing,
+  isParsing,
   currentStep,
   rangeValues,
   analysisSteps,
   startDateFormatted,
-  endDateFormatted
-} = storeToRefs(uploadStore)
+  endDateFormatted,
+} = storeToRefs(store)
 
-const handleFileSelect = (file: File) => {
-  uploadStore.handleFileSelect(file)
-}
+// ── Intent Dispatchers ───────────────────────────────────────────────────────
+// Each user interaction creates a typed Intent and dispatches it to the store.
+// The View has zero business logic — it only describes "what happened".
 
-const handleFileClear = () => {
-  uploadStore.handleFileClear()
-}
+const onFileSelect = (file: File) =>
+  store.dispatch(UploadIntentCreators.selectFile(file))
 
-const nextStep = () => {
-  uploadStore.nextStep()
-}
+const onFileClear = () =>
+  store.dispatch(UploadIntentCreators.clearFile())
 
-const prevStep = () => {
-  uploadStore.prevStep()
-}
+const onNextStep = () =>
+  store.dispatch(UploadIntentCreators.nextStep())
 
-const startAnalysis = () => {
-  uploadStore.startAnalysis()
-}
+const onPrevStep = () =>
+  store.dispatch(UploadIntentCreators.prevStep())
 
-const proceedToResultsWithDemoData = () => {
-  uploadStore.proceedToResultsWithDemoData()
-}
+const onRangeUpdate = (range: [number, number]) =>
+  store.dispatch(UploadIntentCreators.updateRange(range))
+
+const onStartAnalysis = () =>
+  store.dispatch(UploadIntentCreators.startAnalysis())
+
+const onGoBackToFilter = () =>
+  store.dispatch(UploadIntentCreators.prevStep())
 
 onBeforeUnmount(() => {
-  uploadStore.cleanupTimeout()
+  store.dispatch(UploadIntentCreators.cleanup())
 })
 </script>
 
@@ -119,9 +135,9 @@ onBeforeUnmount(() => {
 
         <DropZone
           accept=".txt,.zip"
-          :isAnalyzing="isAnalyzing"
-          @select="handleFileSelect"
-          @clear="handleFileClear"
+          :isAnalyzing="isAnalyzing || isParsing"
+          @select="onFileSelect"
+          @clear="onFileClear"
         />
 
         <div v-if="selectedFile && !uploadError" class="bg-surface/50 border border-border/80 rounded-xl p-3 flex items-center justify-between text-xs animate-fade-in">
@@ -129,8 +145,12 @@ onBeforeUnmount(() => {
             <i class="pi pi-file text-accent text-sm flex-shrink-0"></i>
             <span class="text-ink font-semibold truncate block">{{ selectedFile.name }}</span>
           </div>
-          <span class="text-muted flex-shrink-0 font-mono pl-2">
+          <span v-if="!isParsing" class="text-muted flex-shrink-0 font-mono pl-2">
             {{ (selectedFile.size / 1024).toFixed(1) }} KB
+          </span>
+          <span v-else class="text-accent flex-shrink-0 font-semibold pl-2 flex items-center gap-1.5 animate-pulse">
+            <i class="pi pi-spin pi-spinner"></i>
+            Mengurai berkas...
           </span>
         </div>
 
@@ -145,10 +165,10 @@ onBeforeUnmount(() => {
           </router-link>
 
           <Button
-            @click="nextStep"
-            :disabled="!selectedFile || !!uploadError"
-            label="Selanjutnya"
-            icon="pi pi-arrow-right"
+            @click="onNextStep"
+            :disabled="!selectedFile || !!uploadError || isParsing"
+            :label="isParsing ? 'Memproses berkas...' : 'Selanjutnya'"
+            :icon="isParsing ? 'pi pi-spin pi-spinner' : 'pi pi-arrow-right'"
             iconPos="right"
             class="w-full sm:w-auto !px-5 !py-2.5 !text-sm !font-semibold !rounded-xl !bg-accent hover:opacity-90 disabled:!bg-surface disabled:!text-muted/60 disabled:!cursor-not-allowed !border-none !text-bg !shadow-lg !shadow-accent/20 disabled:!shadow-none transition-all cursor-pointer"
           />
@@ -164,23 +184,24 @@ onBeforeUnmount(() => {
 
         <TimeRangeFilter
           :enabled="true"
-          v-model="rangeValues"
+          :modelValue="rangeValues"
           :startDate="startDateFormatted"
           :endDate="endDateFormatted"
           :chartData="dailyActivity ? { labels: dailyActivity.labels, values: dailyActivity.values } : undefined"
+          @update:modelValue="onRangeUpdate"
         />
 
         <!-- Navigation Buttons Step 2 -->
         <div class="flex items-center justify-between pt-4 border-t border-border/40 gap-4">
           <Button
-            @click="prevStep"
+            @click="onPrevStep"
             label="Kembali"
             icon="pi pi-arrow-left"
             class="!px-5 !py-2.5 !text-sm !font-semibold !rounded-xl !bg-surface hover:!bg-border !border !border-border !text-ink transition-all cursor-pointer"
           />
 
           <Button
-            @click="startAnalysis"
+            @click="onStartAnalysis"
             label="Mulai Analisis"
             icon="pi pi-chart-bar"
             class="!px-6 !py-2.5 !text-sm !font-semibold !rounded-xl !bg-accent hover:opacity-90 !border-none !text-bg !shadow-lg !shadow-accent/20 transition-all cursor-pointer"
@@ -215,23 +236,16 @@ onBeforeUnmount(() => {
           </div>
           <div class="flex flex-wrap items-center gap-3 pt-1">
             <Button
-              @click="startAnalysis"
+              @click="onStartAnalysis"
               label="Coba Lagi"
               icon="pi pi-refresh"
               class="!text-xs !px-4 !py-2 !rounded-lg !bg-red-500 !text-white hover:!bg-red-600 !border-none cursor-pointer"
             />
             <Button
-              @click="currentStep = 2"
+              @click="onGoBackToFilter"
               label="Kembali ke Filter Tanggal"
               icon="pi pi-arrow-left"
               class="!text-xs !px-4 !py-2 !rounded-lg !bg-surface hover:!bg-border !border !border-border !text-ink cursor-pointer"
-            />
-            <!-- Fallback button for presentation safety -->
-            <Button
-              @click="proceedToResultsWithDemoData"
-              label="Lanjutkan dengan Data Demo (Sidang Fallback)"
-              icon="pi pi-eye"
-              class="!text-xs !px-4 !py-2 !rounded-lg !bg-accent hover:opacity-90 !border-none !text-bg cursor-pointer"
             />
           </div>
         </div>
@@ -257,4 +271,3 @@ onBeforeUnmount(() => {
   }
 }
 </style>
-

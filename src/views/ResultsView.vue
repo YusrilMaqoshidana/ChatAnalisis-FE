@@ -1,7 +1,14 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
+// src/views/ResultsView.vue
+// ─── MVI: View Layer for Results Dashboard ───────────────────────────────────
+//
+// The View reads state from the store (via storeToRefs) and dispatches
+// typed Intents in response to user interactions. No business logic here.
+// ─────────────────────────────────────────────────────────────────────────────
+
+import { ref, computed, onMounted } from 'vue'
 import { useResultsStore } from '@/stores/results'
+import { ResultsIntentCreators } from '@/intents/results.intents'
 import MetricCard from '@/components/MetricCard.vue'
 import TopicCard from '@/components/TopicCard.vue'
 import TopSenderList from '@/components/TopSenderList.vue'
@@ -10,28 +17,29 @@ import ActiveHoursChart from '@/components/ActiveHoursChart.vue'
 import Paginator from 'primevue/paginator'
 import Button from 'primevue/button'
 
-const router = useRouter()
 const store = useResultsStore()
 
-const handleTopicClick = (topicId: string | number) => {
-  router.push(`/results/topics/${topicId}`)
-}
+// ── Intent Dispatchers ───────────────────────────────────────────────────────
+onMounted(() => {
+  store.dispatch(ResultsIntentCreators.fetchOverview())
+})
 
-const navigateToUpload = () => {
-  router.push('/upload')
-}
+const onTopicClick = (topicId: string | number) =>
+  store.dispatch(ResultsIntentCreators.navigateToTopic(topicId))
 
-// Pagination state using PrimeVue Paginator
+const onNavigateToUpload = () =>
+  store.dispatch(ResultsIntentCreators.navigateToUpload())
+
+// ── Local UI state (pagination) ───────────────────────────────────────────────
+// Pagination is purely UI state — it does not belong in the store model.
 const first = ref(0)
 const rows = ref(6)
 
-const paginatedTopics = computed(() => {
-  return store.topics.slice(first.value, first.value + rows.value)
-})
+const paginatedTopics = computed(() =>
+  store.topics.slice(first.value, first.value + rows.value),
+)
 
-const showPaginator = computed(() => {
-  return store.topics.length > rows.value
-})
+const showPaginator = computed(() => store.topics.length > rows.value)
 </script>
 
 <template>
@@ -49,7 +57,7 @@ const showPaginator = computed(() => {
         </p>
       </div>
       <Button
-        @click="navigateToUpload"
+        @click="onNavigateToUpload"
         label="Analisis File Baru"
         icon="pi pi-plus"
         class="w-full sm:w-auto !px-5 !py-2.5 !text-sm !font-semibold !rounded-xl !bg-surface hover:!bg-border !border !border-border !text-ink !transition-all duration-200 cursor-pointer"
@@ -138,7 +146,7 @@ const showPaginator = computed(() => {
           :label="topic.label"
           :messageCount="topic.messageCount"
           :keywords="topic.keywords"
-          @click="handleTopicClick"
+          @click="onTopicClick"
         />
       </div>
 

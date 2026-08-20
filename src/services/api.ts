@@ -2,19 +2,29 @@
 import axios from 'axios'
 import type { ResultsSummaryDTO, TopicDetailDTO, MessageContextDTO } from '@/types/results'
 
+export interface BaseResponse<T> {
+  status: string
+  message: string
+  data: T
+}
+
 // Configure default base URL for the backend API
 axios.defaults.baseURL = (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:8000'
 
 export function fetchResults(jobId: string) {
-  return axios.get<ResultsSummaryDTO>(`/api/results/${jobId}`)
+  return axios.get<BaseResponse<ResultsSummaryDTO>>(`/api/results/${jobId}`)
+}
+
+export function deleteResults(jobId: string) {
+  return axios.delete<BaseResponse<{ session_id: string }>>(`/api/results/${jobId}`)
 }
 
 export function fetchTopicDetail(jobId: string, topicId: number) {
-  return axios.get<TopicDetailDTO>(`/api/results/${jobId}/topics/${topicId}`)
+  return axios.get<BaseResponse<TopicDetailDTO>>(`/api/results/${jobId}/topics/${topicId}`)
 }
 
 export function fetchMessageContext(jobId: string, messageId: string) {
-  return axios.get<MessageContextDTO>(`/api/results/${jobId}/messages/${messageId}/context`)
+  return axios.get<BaseResponse<MessageContextDTO>>(`/api/results/${jobId}/messages/${messageId}/context`)
 }
 
 export function uploadChatFile(csvBlob: Blob, sessionId: string, startDate: string, endDate: string) {

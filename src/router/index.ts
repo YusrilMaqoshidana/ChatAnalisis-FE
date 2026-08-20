@@ -1,3 +1,9 @@
+// src/router/index.ts
+// ─── MVI: Router Configuration ───────────────────────────────────────────────
+// The router performs route guards by reading the store model (read-only).
+// Guards do NOT dispatch intents — they are passive observers of state.
+// ─────────────────────────────────────────────────────────────────────────────
+
 import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
 import { useResultsStore } from '@/stores/results'
@@ -13,41 +19,49 @@ const router = createRouter({
     {
       path: '/about',
       name: 'about',
-      // route level code-splitting
-      // this generates a separate chunk (About.[hash].js) for this route
-      // which is lazy-loaded when the route is visited.
       component: () => import('../views/AboutView.vue'),
     },
     {
       path: '/upload',
       name: 'upload',
       component: () => import('../views/UploadView.vue'),
+      beforeEnter: (_to, _from, next) => {
+        // Guard: redirect to results if session already exists (passive read from sessionStorage)
+        const sessionId = sessionStorage.getItem('chat_analisis_session_id')
+        if (sessionId) {
+          next('/results')
+        } else {
+          next()
+        }
+      },
     },
     {
       path: '/results',
       name: 'results',
       component: () => import('../views/ResultsView.vue'),
-      beforeEnter: (to, from, next) => {
+      beforeEnter: (_to, _from, next) => {
+        // Guard: read model state without dispatching any intent
         const store = useResultsStore()
         if (store.isAnalyzed) {
           next()
         } else {
           next('/upload')
         }
-      }
+      },
     },
     {
       path: '/results/topics/:topicId',
       name: 'topic-detail',
       component: () => import('../views/TopicDetailView.vue'),
-      beforeEnter: (to, from, next) => {
+      beforeEnter: (_to, _from, next) => {
+        // Guard: read model state without dispatching any intent
         const store = useResultsStore()
         if (store.isAnalyzed) {
           next()
         } else {
           next('/upload')
         }
-      }
+      },
     },
     {
       path: '/result',
