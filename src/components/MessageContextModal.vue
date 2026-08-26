@@ -17,6 +17,7 @@ const props = defineProps<{
     timestamp: string
   } | null
   contextMessages: ContextMessage[]
+  isLoading?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -66,7 +67,15 @@ const getSenderColorClass = (sender: string) => {
     class="whatsapp-modal"
   >
     <!-- Chat stream wrapper -->
-    <div class="flex flex-col gap-3 py-2 max-h-[60vh] overflow-y-auto px-1 scrollable-chat">
+    <div v-if="isLoading" class="flex flex-col items-center justify-center py-12 space-y-3 text-center">
+      <i class="pi pi-spin pi-spinner text-3xl text-accent"></i>
+      <p class="text-sm text-muted font-medium">Memuat konteks percakapan...</p>
+    </div>
+    <div v-else-if="contextMessages.length === 0" class="flex flex-col items-center justify-center py-12 space-y-2 text-center">
+      <i class="pi pi-inbox text-2xl text-muted"></i>
+      <p class="text-sm text-muted font-medium">Tidak ada konteks pesan tersedia.</p>
+    </div>
+    <div v-else class="flex flex-col gap-3 py-2 max-h-[60vh] overflow-y-auto px-1 scrollable-chat">
       <div 
         v-for="(msg, idx) in contextMessages" 
         :key="idx"

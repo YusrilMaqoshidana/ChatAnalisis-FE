@@ -57,9 +57,9 @@ export function createInitialUploadModel(): UploadModel {
       { id: 3, label: 'Vektorisasi teks menggunakan IndoBERTweet', status: 'pending' },
       { id: 4, label: 'Reduksi dimensi fitur vektor dengan UMAP', status: 'pending' },
       { id: 5, label: 'Klasterisasi pesan dengan BIRCH Clustering', status: 'pending' },
-      { id: 6, label: 'Ekstraksi kata kunci representatif per klaster dengan c-TF-IDF / BM25', status: 'pending' },
+      { id: 6, label: 'Ekstraksi kata kunci representatif per klaster dengan BM25', status: 'pending' },
       { id: 7, label: 'Hitung metrik evaluasi: Diversity, Coherence C-NPMI, Density, Similarity', status: 'pending' },
-      { id: 8, label: 'Simpan hasil analisis di database dengan kunci session_id / jobId', status: 'pending' },
+      { id: 8, label: 'Simpan hasil analisis', status: 'pending' },
     ],
   }
 }

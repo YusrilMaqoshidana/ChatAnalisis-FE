@@ -7,6 +7,8 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
 import { useResultsStore } from '@/stores/results'
+import { useUploadStore } from '@/stores/upload'
+import { UploadIntentCreators } from '@/intents/upload.intents'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -31,6 +33,10 @@ const router = createRouter({
         if (sessionId) {
           next('/results')
         } else {
+          const uploadStore = useUploadStore()
+          if (uploadStore.currentStep !== 1 || uploadStore.selectedFile !== null) {
+            uploadStore.dispatch(UploadIntentCreators.clearFile())
+          }
           next()
         }
       },

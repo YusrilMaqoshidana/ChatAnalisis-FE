@@ -32,6 +32,8 @@ import router from '@/router'
 import { ResultsIntent } from '@/intents/results.intents'
 import type { ResultsIntentAction } from '@/intents/results.intents'
 import { createInitialResultsModel } from '@/models/results.model'
+import { useUploadStore } from '@/stores/upload'
+import { UploadIntentCreators } from '@/intents/upload.intents'
 
 // ─── Mapper Functions ──────────────────────────────────────────────────────────
 // Pure functions that transform backend DTOs → frontend domain models.
@@ -219,7 +221,23 @@ export const useResultsStore = defineStore('results', () => {
       }
     }
     clearSessionId()
-    isAnalyzed.value = false
+
+    // Reset resultsStore model state
+    const initialResults = createInitialResultsModel()
+    isAnalyzed.value = initialResults.isAnalyzed
+    isLoading.value = initialResults.isLoading
+    error.value = initialResults.error
+    metrics.value = initialResults.metrics
+    topics.value = initialResults.topics
+    topSenders.value = initialResults.topSenders
+    activeDates.value = initialResults.activeDates
+    activeHours.value = initialResults.activeHours
+    allMessages.value = initialResults.allMessages
+
+    // Reset uploadStore state to Step 1 via Intent Dispatcher
+    const uploadStore = useUploadStore()
+    uploadStore.dispatch(UploadIntentCreators.clearFile())
+
     router.push('/upload')
   }
 

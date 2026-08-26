@@ -1,5 +1,6 @@
 // src/services/chatParser.ts
 import JSZip from 'jszip'
+import type { ParsedMessage } from '@/types/chat'
 
 // ─── Invisible / special character normalization ───────────────────────────────
 const INVISIBLE_CHARS = [
@@ -9,12 +10,9 @@ const INVISIBLE_CHARS = [
 ]
 const SPACE_LIKE_CHARS = ["\u00a0", "\u202f", "\u2009", "\u2007"]
 
-// ─── Regex Patterns ───────────────────────────────────────────────────────────
-import type { ParsedMessage } from '@/types/chat'
-
-const ANDROID_ID_12H_MSG = /^(\d{2}\/\d{2}\/\d{2})\s+(\d{1,2}\.\d{2})\s+([AP]M)\s+-\s+(.*?):\s+(.*)$/
-const ANDROID_ID_24H_MSG = /^(\d{2}\/\d{2}\/\d{2})\s+(\d{1,2}\.\d{2})\s+-\s+(.*?):\s+(.*)$/
-const ANDROID_EN_12H_MSG = /^(\d{1,2}\/\d{1,2}\/\d{2}),\s+(\d{1,2}:\d{2})\s+([ap]m)\s+-\s+(.*?):\s+(.*)$/
+// ─── Universal WhatsApp Timestamp Regex ───────────────────────────────────────
+// Mendukung berbagai format WhatsApp export (Android ID/EN 12h/24h, iOS, 2/4-digit tahun, dsb)
+const TIMESTAMP_RE = /^(?:\[?(\d{1,4}[/.\-]\d{1,2}[/.\-]\d{1,4}),?\s+(\d{1,2}[:.]\d{2}(?:[:.]\d{2})?)(?:\s*([APap]\.?\s*[Mm]\.?))?\]?)(?:\s*-\s*|\s+)(.*)$/
 
 // ─── Zip extraction ─────────────────────────────────────────────────────────
 /**
@@ -50,160 +48,97 @@ function normalizeLine(text: string): string {
   for (const ch of SPACE_LIKE_CHARS) {
     result = result.replaceAll(ch, " ")
   }
-  return result.replace(/\s+/g, " ").trim()
+  return result.trim()
 }
 
-// ─── Format detection ─────────────────────────────────────────────────────────
-function detectFormat(lines: string[]): string {
+// ─── Format detection (Day First: DD/MM vs MM/DD) ─────────────────────────────
+function detectDayFirstFromLines(lines: string[]): boolean {
   for (const raw of lines) {
     const line = normalizeLine(raw)
-    if (!line) continue
-    if (/^\d{1,2}\/\d{1,2}\/\d{2},\s+\d{1,2}:\d{2}\s+[ap]m/i.test(line)) {
-      return "android_en_12h"
-    }
-    if (/^\d{2}\/\d{2}\/\d{2}\s+\d{1,2}\.\d{2}\s+[AP]M/i.test(line)) {
-      return "android_id_12h"
-    }
-    if (/^\d{2}\/\d{2}\/\d{2}\s+\d{1,2}\.\d{2}\s+-/i.test(line)) {
-      return "android_id_24h"
-    }
-  }
-  return "android_id_24h"
-}
-
-// ─── Timestamp conversion to ISO 8601 ─────────────────────────────────────────
-function parseTimestampToISO(rawTimestamp: string, fmt: string): string {
-  const cleaned = rawTimestamp.replace(/,/g, "").replace(/\s+/g, " ").trim()
-  const parts = cleaned.split(" ")
-  if (parts.length < 2) {
-    throw new Error(`Timestamp tidak valid: ${rawTimestamp}`)
-  }
-
-  const datePart = parts[0] || ""
-  const timePart = parts[1] || ""
-  const meridiemPart = parts[2] || ""
-
-  const dateSplits = datePart.split("/")
-  if (dateSplits.length !== 3) {
-    throw new Error(`Format tanggal tidak valid: ${datePart}`)
-  }
-
-  const day = parseInt(dateSplits[0] || "0", 10)
-  const month = parseInt(dateSplits[1] || "0", 10)
-  const year2d = parseInt(dateSplits[2] || "0", 10)
-  const year = year2d < 100 ? 2000 + year2d : year2d
-
-  const timeSplits = timePart.includes(".") ? timePart.split(".") : timePart.split(":")
-  if (timeSplits.length !== 2) {
-    throw new Error(`Format waktu tidak valid: ${timePart}`)
-  }
-
-  let hour = parseInt(timeSplits[0] || "0", 10)
-  const minute = parseInt(timeSplits[1] || "0", 10)
-
-  if (fmt === "android_id_12h" || fmt === "android_en_12h") {
-    if (meridiemPart) {
-      const med = meridiemPart.toUpperCase()
-      if (med === "PM" && hour < 12) {
-        hour += 12
-      } else if (med === "AM" && hour === 12) {
-        hour = 0
+    const m = line.match(TIMESTAMP_RE)
+    if (m && m[1]) {
+      const dateStr = m[1]
+      const parts = dateStr.split(/[/.\-]/).map(p => parseInt(p, 10))
+      if (parts.length === 3) {
+        const [p0, p1] = parts
+        if (p0 !== undefined && p1 !== undefined) {
+          if (p0 > 12 && p1 <= 12) return true
+          if (p1 > 12 && p0 <= 12) return false
+        }
       }
     }
   }
-
-  const pad = (num: number) => String(num).padStart(2, '0')
-  return `${year}-${pad(month)}-${pad(day)}T${pad(hour)}:${pad(minute)}:00`
+  return true // Default: DD/MM
 }
 
-// ─── Line checkers and parsers ────────────────────────────────────────────────
-function tryParseAndroidId12h(line: string): ParsedMessage | null {
-  const m = line.match(ANDROID_ID_12H_MSG)
-  if (m && m[1] && m[2] && m[3] && m[4] && m[5]) {
-    const tanggal = m[1]
-    const jam = m[2]
-    const meridiem = m[3]
-    const sender = m[4]
-    const pesan = m[5]
-    const rawTs = `${tanggal} ${jam} ${meridiem}`
-    try {
-      return {
-        timestamp: parseTimestampToISO(rawTs, "android_id_12h"),
-        sender: sender.trim(),
-        pesan: pesan
-      }
-    } catch {
-      return null
+// ─── Timestamp conversion to ISO 8601 (YYYY-MM-DDTHH:mm:ss) ────────────────────
+function toIsoTimestamp(
+  dateStr: string,
+  timeStr: string,
+  ampmStr?: string,
+  dayFirst: boolean = true
+): string {
+  const dateParts = dateStr.split(/[/.\-]/).map(p => parseInt(p, 10))
+  if (dateParts.length !== 3 || dateParts.some(isNaN)) {
+    throw new Error(`Format tanggal tidak valid: ${dateStr}`)
+  }
+
+  let year: number, month: number, day: number
+  const [d0, d1, d2] = dateParts as [number, number, number]
+
+  if (d0 > 1000) {
+    // Format YYYY-MM-DD
+    year = d0
+    month = d1
+    day = d2
+  } else if (d2 > 1000) {
+    // Format DD/MM/YYYY atau MM/DD/YYYY
+    year = d2
+    if (dayFirst) {
+      day = d0
+      month = d1
+    } else {
+      month = d0
+      day = d1
+    }
+  } else {
+    // Format 2-digit tahun (YY) -> e.g. 22 -> 2022
+    year = d2 < 100 ? 2000 + d2 : d2
+    if (dayFirst) {
+      day = d0
+      month = d1
+    } else {
+      month = d0
+      day = d1
     }
   }
-  return null
-}
 
-function tryParseAndroidId24h(line: string): ParsedMessage | null {
-  const m = line.match(ANDROID_ID_24H_MSG)
-  if (m && m[1] && m[2] && m[3] && m[4]) {
-    const tanggal = m[1]
-    const jam = m[2]
-    const sender = m[3]
-    const pesan = m[4]
-    const rawTs = `${tanggal} ${jam}`
-    try {
-      return {
-        timestamp: parseTimestampToISO(rawTs, "android_id_24h"),
-        sender: sender.trim(),
-        pesan: pesan
-      }
-    } catch {
-      return null
+  const timeParts = timeStr.split(/[:.]/).map(p => parseInt(p, 10))
+  if (timeParts.length < 2 || timeParts.some(isNaN)) {
+    throw new Error(`Format waktu tidak valid: ${timeStr}`)
+  }
+
+  let hour = timeParts[0]!
+  const minute = timeParts[1]!
+  const second = timeParts.length > 2 ? timeParts[2]! : 0
+
+  if (ampmStr) {
+    const ampm = ampmStr.toLowerCase().replace(/\./g, "").trim()
+    if (ampm === "pm" && hour < 12) {
+      hour += 12
+    } else if (ampm === "am" && hour === 12) {
+      hour = 0
     }
   }
-  return null
-}
 
-function tryParseAndroidEn12h(line: string): ParsedMessage | null {
-  const m = line.match(ANDROID_EN_12H_MSG)
-  if (m && m[1] && m[2] && m[3] && m[4] && m[5]) {
-    const tanggal = m[1]
-    const jam = m[2]
-    const meridiem = m[3]
-    const sender = m[4]
-    const pesan = m[5]
-    const rawTs = `${tanggal} ${jam} ${meridiem}`
-    try {
-      return {
-        timestamp: parseTimestampToISO(rawTs, "android_en_12h"),
-        sender: sender.trim(),
-        pesan: pesan
-      }
-    } catch {
-      return null
-    }
-  }
-  return null
-}
-
-function isTimestampLine(line: string, fmt: string): boolean {
-  if (fmt === "android_en_12h") {
-    return /^\d{1,2}\/\d{1,2}\/\d{2},\s+\d{1,2}:\d{2}\s+[ap]m/i.test(line)
-  }
-  if (fmt === "android_id_12h") {
-    return /^\d{2}\/\d{2}\/\d{2}\s+\d{1,2}\.\d{2}\s+[AP]M/i.test(line)
-  }
-  return /^\d{2}\/\d{2}\/\d{2}\s+\d{1,2}\.\d{2}\s+-/i.test(line)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${year}-${pad(month)}-${pad(day)}T${pad(hour)}:${pad(minute)}:${pad(second)}`
 }
 
 // ─── Main Parser ──────────────────────────────────────────────────────────────
 export async function parsingTxtToMessages(fileContent: string): Promise<ParsedMessage[]> {
   const lines = fileContent.split(/\r?\n/)
-  const fmt = detectFormat(lines)
-  console.log(`[INFO] Format terdeteksi: {fmt}`)
-
-  const parseFnMap: Record<string, (line: string) => ParsedMessage | null> = {
-    "android_id_12h": tryParseAndroidId12h,
-    "android_id_24h": tryParseAndroidId24h,
-    "android_en_12h": tryParseAndroidEn12h,
-  }
-  const parseFn = parseFnMap[fmt] || tryParseAndroidId24h
+  const dayFirst = detectDayFirstFromLines(lines)
 
   const messages: ParsedMessage[] = []
   let currentMsg: ParsedMessage | null = null
@@ -212,20 +147,45 @@ export async function parsingTxtToMessages(fileContent: string): Promise<ParsedM
     const line = normalizeLine(raw)
     if (!line) continue
 
-    const parsed = parseFn(line)
-    if (parsed !== null) {
-      if (currentMsg !== null) {
-        messages.push(currentMsg)
+    const m = line.match(TIMESTAMP_RE)
+    if (m) {
+      const dateStr = m[1] || ""
+      const timeStr = m[2] || ""
+      const ampmStr = m[3]
+      const content = m[4] || ""
+
+      const colonIdx = content.indexOf(": ")
+      if (colonIdx !== -1) {
+        const sender = content.substring(0, colonIdx).trim()
+        const pesan = content.substring(colonIdx + 2).trim()
+
+        try {
+          const isoTs = toIsoTimestamp(dateStr, timeStr, ampmStr, dayFirst)
+          if (currentMsg !== null) {
+            messages.push(currentMsg)
+          }
+          currentMsg = {
+            timestamp: isoTs,
+            sender: sender,
+            pesan: pesan,
+          }
+        } catch {
+          if (currentMsg !== null) {
+            messages.push(currentMsg)
+          }
+          currentMsg = null
+        }
+      } else {
+        // System message line (group created, user added, encryption notice, etc.)
+        if (currentMsg !== null) {
+          messages.push(currentMsg)
+        }
+        currentMsg = null
       }
-      currentMsg = parsed
-    } else if (isTimestampLine(line, fmt)) {
-      if (currentMsg !== null) {
-        messages.push(currentMsg)
-      }
-      currentMsg = null
     } else {
+      // Continuation line (multi-line message)
       if (currentMsg !== null) {
-        currentMsg.pesan = `${currentMsg.pesan}\n${line}`.trim()
+        currentMsg.pesan = `${currentMsg.pesan}\n${line}`
       }
     }
   }

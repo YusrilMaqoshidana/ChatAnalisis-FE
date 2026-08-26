@@ -287,9 +287,9 @@ src/
 3. Vektorisasi teks menggunakan IndoBERTweet
 4. Reduksi dimensi fitur vektor dengan UMAP
 5. Klasterisasi pesan dengan BIRCH Clustering
-6. Ekstraksi kata kunci representatif per klaster (c-TF-IDF / BM25)
+6. Ekstraksi kata kunci representatif per klaster dengan BM25
 7. Hitung metrik evaluasi (Diversity, Coherence, Density, Similarity)
-8. Simpan hasil di database dengan kunci session_id
+8. Simpan hasil analisis
 
 **Error Recovery**:
 - Tombol "Coba Lagi" → dispatch `startAnalysis` ulang

@@ -21,7 +21,8 @@ const closeMobileMenu = () => {
       <div class="flex h-16 items-center justify-between">
         <!-- Logo / Brand -->
         <div class="flex items-center">
-          <RouterLink to="/" @click="closeMobileMenu" class="flex items-center gap-2 group">
+          <RouterLink to="/" @click="closeMobileMenu" class="flex items-center gap-2.5 group">
+            <img src="/chat-analisis-logo.jpg" alt="Chat Analisis Logo" class="w-8 h-8 rounded-lg object-cover border border-border/60 shadow-sm" />
             <span class="text-base sm:text-lg font-bold text-ink tracking-tight"
               >Chat Analisis</span
             >

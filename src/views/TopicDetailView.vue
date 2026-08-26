@@ -164,6 +164,28 @@ const onMessageClick = async (msg: {
       </div>
     </div>
 
+    <!-- Header Skeleton when loading overview & topic is not available yet -->
+    <div
+      v-else-if="isMessagesLoading"
+      class="bg-surface/30 border border-border/80 rounded-2xl p-6 md:p-8 space-y-4 animate-pulse"
+    >
+      <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div class="space-y-2 w-full md:w-1/2">
+          <div class="h-3 bg-border/60 rounded w-1/4"></div>
+          <div class="h-8 bg-border/50 rounded w-3/4"></div>
+        </div>
+        <div class="bg-accent/10 border border-accent/20 rounded-xl px-4 py-2 w-32 h-12 flex flex-col justify-center items-end">
+          <div class="h-2.5 bg-border/50 rounded w-16 mb-1"></div>
+          <div class="h-4 bg-border/60 rounded w-20"></div>
+        </div>
+      </div>
+      <div class="flex gap-2 pt-2 border-t border-border/50">
+        <div class="h-5 bg-border/40 rounded w-16"></div>
+        <div class="h-5 bg-border/40 rounded w-16"></div>
+        <div class="h-5 bg-border/40 rounded w-16"></div>
+      </div>
+    </div>
+
     <div v-else class="text-center py-12 bg-surface/30 border border-border/85 rounded-2xl">
       <i class="pi pi-exclamation-circle text-accent text-3xl mb-2"></i>
       <h3 class="text-lg font-bold text-ink">Klaster topik tidak ditemukan</h3>
@@ -177,11 +199,49 @@ const onMessageClick = async (msg: {
           <i class="pi pi-comments text-accent"></i>
           Daftar Pesan dalam Topik
         </h2>
-        <span class="text-xs text-muted">{{ topicMessages.length }} pesan teridentifikasi</span>
+        <span v-if="isMessagesLoading" class="text-xs text-accent flex items-center gap-1.5 font-medium">
+          <i class="pi pi-spin pi-spinner"></i>
+          Memuat pesan...
+        </span>
+        <span v-else class="text-xs text-muted">{{ topicMessages.length }} pesan teridentifikasi</span>
+      </div>
+
+      <!-- Loading Skeleton / Spinner State -->
+      <div v-if="isMessagesLoading" class="space-y-3">
+        <div class="p-6 bg-surface/20 border border-border/50 rounded-2xl text-center space-y-3">
+          <i class="pi pi-spin pi-spinner text-3xl text-accent"></i>
+          <p class="text-sm text-muted font-medium">Sedang memuat daftar pesan topik...</p>
+        </div>
+        
+        <div
+          v-for="i in 5"
+          :key="i"
+          class="bg-surface/20 border border-border/50 p-4 rounded-xl flex items-start gap-4 animate-pulse"
+        >
+          <div class="w-8 h-8 rounded-full bg-border/60 flex-shrink-0"></div>
+          <div class="flex-grow space-y-2">
+            <div class="flex justify-between items-center">
+              <div class="h-3.5 bg-border/60 rounded w-1/4"></div>
+              <div class="h-3 bg-border/40 rounded w-16"></div>
+            </div>
+            <div class="h-3.5 bg-border/40 rounded w-5/6"></div>
+            <div class="h-3 bg-border/30 rounded w-2/3"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Empty State -->
+      <div
+        v-else-if="sortedMessages.length === 0"
+        class="text-center py-12 bg-surface/20 border border-border/50 rounded-2xl space-y-2"
+      >
+        <i class="pi pi-inbox text-muted text-3xl mb-1"></i>
+        <h4 class="text-base font-bold text-ink">Tidak Ada Pesan</h4>
+        <p class="text-sm text-muted">Belum ada pesan yang teridentifikasi dalam topik ini.</p>
       </div>
 
       <!-- Message List -->
-      <div class="space-y-3">
+      <div v-else class="space-y-3">
         <MessageListItem
           v-for="msg in sortedMessages"
           :key="msg.id"
@@ -198,6 +258,7 @@ const onMessageClick = async (msg: {
       v-model:visible="modalVisible"
       :focusedMessage="focusedMessage"
       :contextMessages="contextMessages"
+      :isLoading="isContextLoading"
     />
   </div>
 </template>
