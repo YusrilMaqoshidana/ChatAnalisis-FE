@@ -6,6 +6,7 @@ interface ContextMessage {
   sender: string
   content: string
   timestamp: string
+  date?: string
   isFocused: boolean
 }
 
@@ -15,6 +16,7 @@ const props = defineProps<{
     sender: string
     content: string
     timestamp: string
+    date?: string
   } | null
   contextMessages: ContextMessage[]
   isLoading?: boolean
@@ -32,6 +34,40 @@ const localVisible = computed({
 // Check if the sender is the one who sent the focused message
 const isFocusedSender = (sender: string) => {
   return sender === props.focusedMessage?.sender
+}
+
+// Format date helper for chat bubble display
+const formatDate = (dateStr?: string): string => {
+  if (!dateStr) return ''
+  const trimmed = dateStr.trim()
+  const datePart = trimmed.split('T')[0] ?? trimmed.split(' ')[0] ?? ''
+
+  if (/^\d{4}-\d{2}-\d{2}/.test(datePart)) {
+    const parts = datePart.split('-')
+    const year = parts[0] ?? ''
+    const month = parts[1] ?? ''
+    const day = parts[2] ?? ''
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des']
+    const mIdx = parseInt(month, 10) - 1
+    if (mIdx >= 0 && mIdx < 12 && day && year) {
+      return `${parseInt(day, 10)} ${months[mIdx]} ${year}`
+    }
+  }
+
+  if (/^\d{1,2}\/\d{1,2}\/\d{2,4}/.test(trimmed)) {
+    const parts = trimmed.split('/')
+    const day = parts[0] ?? ''
+    const month = parts[1] ?? ''
+    let year = parts[2] ?? ''
+    if (year.length === 2) year = '20' + year
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des']
+    const mIdx = parseInt(month, 10) - 1
+    if (mIdx >= 0 && mIdx < 12 && day && year) {
+      return `${parseInt(day, 10)} ${months[mIdx]} ${year}`
+    }
+  }
+
+  return trimmed
 }
 
 // Generate consistent dynamic name color classes based on sender name
@@ -123,10 +159,11 @@ const getSenderColorClass = (sender: string) => {
             {{ msg.content }}
           </p>
 
-          <!-- Timestamp -->
-          <span class="text-[9px] text-muted/70 text-right block font-mono self-end">
-            {{ msg.timestamp }}
-          </span>
+          <!-- Timestamp & Date -->
+          <div class="text-[9px] text-muted/70 text-right block font-mono self-end leading-tight mt-1">
+            <span v-if="formatDate(msg.date)" class="block text-[8.5px] opacity-80">{{ formatDate(msg.date) }}</span>
+            <span>{{ msg.timestamp }}</span>
+          </div>
         </div>
       </div>
     </div>

@@ -30,7 +30,7 @@ const topic = computed(() => store.topics.find((t) => t.topicId === topicId.valu
 const topicMessages = ref<Message[]>([])
 const isMessagesLoading = ref(false)
 const modalVisible = ref(false)
-const focusedMessage = ref<{ sender: string; content: string; timestamp: string } | null>(null)
+const focusedMessage = ref<{ sender: string; content: string; timestamp: string; date?: string } | null>(null)
 const contextMessages = ref<MessageContext[]>([])
 const isContextLoading = ref(false)
 
@@ -93,11 +93,13 @@ const onMessageClick = async (msg: {
   sender: string
   content: string
   timestamp: string
+  date?: string
 }) => {
   focusedMessage.value = {
     sender: msg.sender,
     content: msg.content,
     timestamp: msg.timestamp,
+    date: msg.date,
   }
   isContextLoading.value = true
   contextMessages.value = []
@@ -248,6 +250,7 @@ const onMessageClick = async (msg: {
           :sender="msg.sender"
           :content="msg.content"
           :timestamp="msg.timestamp"
+          :date="msg.date"
           @click="onMessageClick(msg)"
         />
       </div>

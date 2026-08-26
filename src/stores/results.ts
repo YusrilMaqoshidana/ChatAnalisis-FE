@@ -91,6 +91,7 @@ export interface MessageContext {
   sender: string
   content: string
   timestamp: string
+  date?: string
   isFocused: boolean
 }
 
@@ -126,6 +127,7 @@ export const useResultsStore = defineStore('results', () => {
       sender: msg.sender,
       content: msg.content,
       timestamp: msg.timestamp,
+      date: msg.date,
       isFocused: msg.id === messageId,
     }))
   }
@@ -202,6 +204,7 @@ export const useResultsStore = defineStore('results', () => {
           sender: m.sender,
           content: m.content,
           timestamp: m.timestamp.split(' ').pop()?.substring(0, 5) ?? m.timestamp,
+          date: m.timestamp.split(' ')[0] ?? '',
           isFocused: m.is_focused,
         }),
       )
