@@ -1,6 +1,6 @@
 services:
   # ----------------------------------------------------
-  # Frontend Service (Vue 3 + Vite + Nginx)
+  # Frontend Service (Vue 3 + Vite)
   # ----------------------------------------------------
   frontend:
     build:
@@ -10,14 +10,23 @@ services:
       network: host
     container_name: chatanalisis-frontend
     ports:
-      - "80:80"
+      - "${FRONTEND_PORT:-8080}:80"
     restart: unless-stopped
     networks:
-      - chatanalisis-network
+      chatanalisis-network:
+        aliases:
+          - frontend
+          - chatanalisis-frontend
+      proxy-net:
+        aliases:
+          - chatanalisis-fe
+          - chatanalisis-frontend
 
 networks:
   chatanalisis-network:
     name: chatanalisis-network
+  proxy-net:
+    external: true
 
 # ==============================================================================
 # DOKUMENTASI & PANDUAN PENGGUNAAN (FRONTEND DOCKER COMPOSE)

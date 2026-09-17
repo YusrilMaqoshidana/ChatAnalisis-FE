@@ -12,12 +12,15 @@ RUN npm install
 COPY . .
 RUN npm run build
 
-# Production stage
-FROM nginx:stable-alpine AS production-stage
+# Production stage (Using Node + serve to eliminate Nginx dependency inside container)
+FROM node:22-alpine AS production-stage
 
-COPY --from=build-stage /app/dist /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+WORKDIR /app
+
+RUN npm install -g serve
+
+COPY --from=build-stage /app/dist /app/dist
 
 EXPOSE 80
 
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["serve", "-s", "dist", "-l", "80"]
