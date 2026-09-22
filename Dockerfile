@@ -1,26 +1,31 @@
 # Build stage
 FROM node:22-alpine AS build-stage
 
-ARG VITE_API_BASE_URL
+ARG VITE_API_BASE_URL=/
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm install
+RUN npm ci
 
 COPY . .
 RUN npm run build
 
-# Production stage (Using Node + serve to eliminate Nginx dependency inside container)
-FROM node:22-alpine AS production-stage
+# Production stage (Using Nginx for high-performance static file serving + Zero CORS Reverse Proxy)
+FROM nginx:alpine AS production-stage
 
-WORKDIR /app
+WORKDIR /usr/share/nginx/html
 
-RUN npm install -g serve
+# Clear default static assets
+RUN rm -rf ./*
 
-COPY --from=build-stage /app/dist /app/dist
+# Copy built SPA dist from build stage
+COPY --from=build-stage /app/dist .
+
+# Copy Nginx reverse proxy configuration
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
 
-CMD ["serve", "-s", "dist", "-l", "80"]
+CMD ["nginx", "-g", "daemon off;"]
