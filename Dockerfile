@@ -12,15 +12,15 @@ RUN npm install
 COPY . .
 RUN npm run build
 
-# Production stage (Using Node + serve to eliminate Nginx dependency inside container)
-FROM node:22-alpine AS production-stage
+# Production stage (Using Nginx to serve static files and reverse proxy API requests to backend)
+FROM nginx:alpine AS production-stage
 
-WORKDIR /app
+# Copy custom Nginx configuration
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-RUN npm install -g serve
+# Copy build output from build-stage to nginx html folder
+COPY --from=build-stage /app/dist /usr/share/nginx/html
 
-COPY --from=build-stage /app/dist /app/dist
+EXPOSE 3000
 
-EXPOSE 80
-
-CMD ["serve", "-s", "dist", "-l", "80"]
+CMD ["nginx", "-g", "daemon off;"]

@@ -194,7 +194,7 @@ export const useUploadStore = defineStore('upload', () => {
         firstStep.timeElapsed = `${Math.round(Date.now() - startTime)}ms`
       }
 
-      const baseUrl = (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:8000'
+      const baseUrl = (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:8001'
       let sseUrl = ''
       if (baseUrl === '/') {
         sseUrl = `/api/analysis/events/${sessionId}`
