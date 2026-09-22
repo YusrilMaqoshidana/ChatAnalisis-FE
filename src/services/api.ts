@@ -9,7 +9,7 @@ export interface BaseResponse<T> {
 }
 
 // Configure default base URL for the backend API
-axios.defaults.baseURL = (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:8001'
+axios.defaults.baseURL = (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:8000'
 
 export function fetchResults(jobId: string) {
   return axios.get<BaseResponse<ResultsSummaryDTO>>(`/api/results/${jobId}`)
