@@ -135,6 +135,32 @@ function toIsoTimestamp(
   return `${year}-${pad(month)}-${pad(day)}T${pad(hour)}:${pad(minute)}:${pad(second)}`
 }
 
+const SYSTEM_MESSAGE_PATTERNS = [
+  /this message was deleted/i,
+  /pesan ini telah dihapus/i,
+  /you deleted this message/i,
+  /anda telah menghapus pesan ini/i,
+  /media omitted/i,
+  /media tidak disertakan/i,
+  /gambar tidak disertakan/i,
+  /video tidak disertakan/i,
+  /stiker tidak disertakan/i,
+  /audio tidak disertakan/i,
+  /dokumen tidak disertakan/i,
+  /kontak tidak disertakan/i,
+  /lokasi tidak disertakan/i,
+  /missed voice call/i,
+  /missed video call/i,
+  /panggilan (suara|video|tak terjawab)/i,
+  /\.vcf/i,
+]
+
+function isSystemNoise(text: string): boolean {
+  const trimmed = text.trim()
+  if (!trimmed) return true
+  return SYSTEM_MESSAGE_PATTERNS.some(p => p.test(trimmed))
+}
+
 // ─── Main Parser ──────────────────────────────────────────────────────────────
 export async function parsingTxtToMessages(fileContent: string): Promise<ParsedMessage[]> {
   const lines = fileContent.split(/\r?\n/)
@@ -161,7 +187,7 @@ export async function parsingTxtToMessages(fileContent: string): Promise<ParsedM
 
         try {
           const isoTs = toIsoTimestamp(dateStr, timeStr, ampmStr, dayFirst)
-          if (currentMsg !== null) {
+          if (currentMsg !== null && !isSystemNoise(currentMsg.pesan)) {
             messages.push(currentMsg)
           }
           currentMsg = {
@@ -170,14 +196,14 @@ export async function parsingTxtToMessages(fileContent: string): Promise<ParsedM
             pesan: pesan,
           }
         } catch {
-          if (currentMsg !== null) {
+          if (currentMsg !== null && !isSystemNoise(currentMsg.pesan)) {
             messages.push(currentMsg)
           }
           currentMsg = null
         }
       } else {
         // System message line (group created, user added, encryption notice, etc.)
-        if (currentMsg !== null) {
+        if (currentMsg !== null && !isSystemNoise(currentMsg.pesan)) {
           messages.push(currentMsg)
         }
         currentMsg = null
@@ -190,7 +216,7 @@ export async function parsingTxtToMessages(fileContent: string): Promise<ParsedM
     }
   }
 
-  if (currentMsg !== null) {
+  if (currentMsg !== null && !isSystemNoise(currentMsg.pesan)) {
     messages.push(currentMsg)
   }
 

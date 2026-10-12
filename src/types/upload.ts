@@ -11,7 +11,8 @@ export interface DailyActivity {
 export interface AnalysisStep {
   id: number
   label: string
-  status: 'pending' | 'running' | 'completed' | 'failed'
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'skipped'
   timeElapsed?: string
+  isSkipped?: boolean
 }
 

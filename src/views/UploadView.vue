@@ -32,6 +32,7 @@ const {
   isParsing,
   currentStep,
   rangeValues,
+  analysisMode,
   analysisSteps,
   startDateFormatted,
   endDateFormatted,
@@ -55,6 +56,9 @@ const onPrevStep = () =>
 
 const onRangeUpdate = (range: [number, number]) =>
   store.dispatch(UploadIntentCreators.updateRange(range))
+
+const onSelectMode = (mode: 'fast' | 'full') =>
+  store.dispatch(UploadIntentCreators.setAnalysisMode(mode))
 
 const onStartAnalysis = () =>
   store.dispatch(UploadIntentCreators.startAnalysis())
@@ -190,6 +194,60 @@ onBeforeUnmount(() => {
           :chartData="dailyActivity ? { labels: dailyActivity.labels, values: dailyActivity.values } : undefined"
           @update:modelValue="onRangeUpdate"
         />
+
+        <!-- Pilihan Mode Analisis (Dual-Mode: Fast vs Full/Research) -->
+        <div class="space-y-2.5 pt-2 border-t border-border/40">
+          <div class="flex items-center justify-between">
+            <label class="text-xs font-bold text-ink uppercase tracking-wider block">Mode Analisis</label>
+            <span class="text-[10px] text-muted">Pilih prioritas kecepatan atau kelengkapan metrik</span>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <!-- Mode Cepat -->
+            <div
+              @click="onSelectMode('fast')"
+              :class="[
+                'p-3.5 rounded-xl border cursor-pointer transition-all duration-200 flex flex-col justify-between text-left',
+                analysisMode === 'fast'
+                  ? 'border-accent bg-accent/10 shadow-sm shadow-accent/10 ring-1 ring-accent/30'
+                  : 'border-border/80 bg-surface/40 hover:border-border hover:bg-surface/60'
+              ]"
+            >
+              <div class="flex items-center justify-between mb-1.5">
+                <span class="text-xs font-bold flex items-center gap-1.5" :class="analysisMode === 'fast' ? 'text-accent' : 'text-ink'">
+                  <i class="pi pi-bolt text-xs"></i>
+                  Mode Cepat
+                </span>
+                <span class="text-[9px] font-bold px-2 py-0.5 rounded-full bg-accent/20 text-accent">Rekomendasi</span>
+              </div>
+              <p class="text-[11px] text-muted leading-relaxed">
+                Langsung fokus pada topik & visualisasi. Melewati metrik matematis berat agar selesai dalam hitungan detik.
+              </p>
+            </div>
+
+            <!-- Mode Riset Lengkap -->
+            <div
+              @click="onSelectMode('full')"
+              :class="[
+                'p-3.5 rounded-xl border cursor-pointer transition-all duration-200 flex flex-col justify-between text-left',
+                analysisMode === 'full'
+                  ? 'border-accent bg-accent/10 shadow-sm shadow-accent/10 ring-1 ring-accent/30'
+                  : 'border-border/80 bg-surface/40 hover:border-border hover:bg-surface/60'
+              ]"
+            >
+              <div class="flex items-center justify-between mb-1.5">
+                <span class="text-xs font-bold flex items-center gap-1.5" :class="analysisMode === 'full' ? 'text-accent' : 'text-ink'">
+                  <i class="pi pi-book text-xs"></i>
+                  Mode Riset Lengkap
+                </span>
+                <span class="text-[9px] font-bold px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-400">Skripsi</span>
+              </div>
+              <p class="text-[11px] text-muted leading-relaxed">
+                Menghitung metrik akademis lengkap (C-NPMI Coherence, Density, Similarity) untuk evaluasi skripsi.
+              </p>
+            </div>
+          </div>
+        </div>
 
         <!-- Navigation Buttons Step 2 -->
         <div class="flex items-center justify-between pt-4 border-t border-border/40 gap-4">

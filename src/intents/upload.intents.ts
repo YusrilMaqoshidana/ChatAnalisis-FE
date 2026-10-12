@@ -10,6 +10,7 @@ export const enum UploadIntent {
   NEXT_STEP = 'upload/NEXT_STEP',
   PREV_STEP = 'upload/PREV_STEP',
   UPDATE_RANGE = 'upload/UPDATE_RANGE',
+  SET_ANALYSIS_MODE = 'upload/SET_ANALYSIS_MODE',
   START_ANALYSIS = 'upload/START_ANALYSIS',
   CLEANUP = 'upload/CLEANUP',
 }
@@ -23,6 +24,10 @@ export interface UpdateRangePayload {
   range: [number, number]
 }
 
+export interface SetAnalysisModePayload {
+  mode: 'fast' | 'full'
+}
+
 // ─── Intent Union Type ───────────────────────────────────────────────────────
 export type UploadIntentAction =
   | { type: UploadIntent.SELECT_FILE; payload: SelectFilePayload }
@@ -30,6 +35,7 @@ export type UploadIntentAction =
   | { type: UploadIntent.NEXT_STEP }
   | { type: UploadIntent.PREV_STEP }
   | { type: UploadIntent.UPDATE_RANGE; payload: UpdateRangePayload }
+  | { type: UploadIntent.SET_ANALYSIS_MODE; payload: SetAnalysisModePayload }
   | { type: UploadIntent.START_ANALYSIS }
   | { type: UploadIntent.CLEANUP }
 
@@ -52,6 +58,10 @@ export const UploadIntentCreators = {
   updateRange: (range: [number, number]): UploadIntentAction => ({
     type: UploadIntent.UPDATE_RANGE,
     payload: { range },
+  }),
+  setAnalysisMode: (mode: 'fast' | 'full'): UploadIntentAction => ({
+    type: UploadIntent.SET_ANALYSIS_MODE,
+    payload: { mode },
   }),
   startAnalysis: (): UploadIntentAction => ({
     type: UploadIntent.START_ANALYSIS,

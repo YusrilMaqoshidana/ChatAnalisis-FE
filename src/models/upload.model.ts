@@ -27,6 +27,9 @@ export interface UploadModel {
   // Date range filter state (percentages 0-100)
   rangeValues: [number, number]
 
+  // Mode analisis (fast vs full/riset)
+  analysisMode: 'fast' | 'full'
+
   // Analysis progress state
   activeStepIdx: number
   activeTimeoutId: number | null
@@ -49,6 +52,7 @@ export function createInitialUploadModel(): UploadModel {
     isAnalyzing: false,
     isParsing: false,
     rangeValues: [0, 100],
+    analysisMode: 'fast',
     activeStepIdx: -1,
     activeTimeoutId: null,
     analysisSteps: [

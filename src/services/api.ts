@@ -27,12 +27,19 @@ export function fetchMessageContext(jobId: string, messageId: string) {
   return axios.get<BaseResponse<MessageContextDTO>>(`/api/results/${jobId}/messages/${messageId}/context`)
 }
 
-export function uploadChatFile(csvBlob: Blob, sessionId: string, startDate: string, endDate: string) {
+export function uploadChatFile(
+  csvBlob: Blob,
+  sessionId: string,
+  startDate: string,
+  endDate: string,
+  mode: 'fast' | 'full' = 'fast'
+) {
   const formData = new FormData()
   formData.append('file', csvBlob, 'whatsapp_chat.csv')
   formData.append('session_id', sessionId)
   if (startDate) formData.append('startDate', startDate)
   if (endDate) formData.append('endDate', endDate)
+  formData.append('mode', mode)
   
   return axios.post('/analysis', formData, {
     headers: {

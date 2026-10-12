@@ -37,6 +37,7 @@ export interface ResultsSummaryDTO {
   top_senders: SenderStatDTO[]
   active_dates: ActiveDateDTO[]
   active_hours: ActiveHourDTO[]
+  analysis_mode?: string
 }
 
 export interface MessageDTO {

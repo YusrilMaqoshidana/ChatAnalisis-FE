@@ -2,8 +2,9 @@
 interface AnalysisStep {
   id: number
   label: string
-  status: 'pending' | 'running' | 'completed' | 'failed'
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'skipped'
   timeElapsed?: string
+  isSkipped?: boolean
 }
 
 defineProps<{
@@ -39,6 +40,7 @@ defineProps<{
         >
           <!-- Status Symbols -->
           <span v-if="step.status === 'completed'" class="text-accent-alt font-extrabold flex-shrink-0">✔</span>
+          <span v-else-if="step.status === 'skipped'" class="text-amber-400 font-extrabold flex-shrink-0" title="Dilewati pada Mode Cepat">⚡</span>
           <span v-else-if="step.status === 'failed'" class="text-red-500 font-extrabold flex-shrink-0">✘</span>
           <span v-else-if="step.status === 'running'" class="text-accent font-extrabold animate-pulse flex-shrink-0">❯</span>
           <span v-else class="text-muted/40 font-bold flex-shrink-0">○</span>
@@ -47,6 +49,7 @@ defineProps<{
           <div class="flex-grow min-w-0">
             <span :class="[
               step.status === 'completed' ? 'text-ink' : '',
+              step.status === 'skipped' ? 'text-muted/80 italic' : '',
               step.status === 'failed' ? 'text-red-400 font-semibold' : '',
               step.status === 'running' ? 'text-accent font-bold' : '',
               step.status === 'pending' ? 'text-muted/65' : ''
@@ -58,7 +61,7 @@ defineProps<{
           </div>
           
           <!-- Timestamp Duration -->
-          <span v-if="step.status === 'completed'" class="text-[10px] text-muted/80 pl-2 flex-shrink-0 font-mono">
+          <span v-if="step.status === 'completed' || step.status === 'skipped'" class="text-[10px] text-muted/80 pl-2 flex-shrink-0 font-mono">
             ({{ step.timeElapsed }})
           </span>
         </div>

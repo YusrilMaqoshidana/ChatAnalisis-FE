@@ -42,6 +42,7 @@ export const useUploadStore = defineStore('upload', () => {
   const isParsing = ref(_initial.isParsing)
   const currentStep = ref<1 | 2 | 3>(_initial.currentStep)
   const rangeValues = ref<[number, number]>(_initial.rangeValues)
+  const analysisMode = ref<'fast' | 'full'>(_initial.analysisMode)
   const activeStepIdx = ref(_initial.activeStepIdx)
   const activeTimeoutId = ref<number | null>(_initial.activeTimeoutId)
   const analysisSteps = ref(_initial.analysisSteps)
@@ -144,6 +145,10 @@ export const useUploadStore = defineStore('upload', () => {
     rangeValues.value = range
   }
 
+  const _handleSetAnalysisMode = (mode: 'fast' | 'full') => {
+    analysisMode.value = mode
+  }
+
   const _handleStartAnalysis = async () => {
     if (!selectedFile.value || rawMessages.value.length === 0) return
     currentStep.value = 3
@@ -187,7 +192,13 @@ export const useUploadStore = defineStore('upload', () => {
       const sessionId = getOrCreateSessionId()
       const csvBlob = new Blob([csvStr], { type: 'text/csv;charset=utf-8' })
 
-      await uploadChatFile(csvBlob, sessionId, startDateParam.value || '', endDateParam.value || '')
+      await uploadChatFile(
+        csvBlob,
+        sessionId,
+        startDateParam.value || '',
+        endDateParam.value || '',
+        analysisMode.value
+      )
 
       if (firstStep) {
         firstStep.status = 'completed'
@@ -225,8 +236,13 @@ export const useUploadStore = defineStore('upload', () => {
           if (data.step_id) {
             const stepObj = analysisSteps.value.find((s) => s.id === data.step_id)
             if (stepObj) {
-              stepObj.status = data.status
-              if (data.time_elapsed) stepObj.timeElapsed = data.time_elapsed
+              stepObj.status = data.skipped ? 'skipped' : data.status
+              if (data.skipped) {
+                stepObj.isSkipped = true
+                stepObj.timeElapsed = 'Dilewati (Mode Cepat)'
+              } else if (data.time_elapsed) {
+                stepObj.timeElapsed = data.time_elapsed
+              }
             }
             if (data.status === 'running') activeStepIdx.value = data.step_id - 1
           }
@@ -291,6 +307,9 @@ export const useUploadStore = defineStore('upload', () => {
       case UploadIntent.UPDATE_RANGE:
         _handleUpdateRange(intent.payload.range)
         break
+      case UploadIntent.SET_ANALYSIS_MODE:
+        _handleSetAnalysisMode(intent.payload.mode)
+        break
       case UploadIntent.START_ANALYSIS:
         await _handleStartAnalysis()
         break
@@ -317,6 +336,7 @@ export const useUploadStore = defineStore('upload', () => {
     isParsing,
     currentStep,
     rangeValues,
+    analysisMode,
     activeStepIdx,
     analysisSteps,
     // Derived state
